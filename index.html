@@ -117,20 +117,20 @@ function calcHr(){let a=mins($("h_i").value),b=mins($("h_n").value);if(b<a)b+=14
 const num=v=>v===""||v==null?"":+v,nid=(p,n)=>p+Date.now()+"-"+n.replace(/[^A-Za-z0-9]/g,"");
 
 // Envío: cada registro entra a una cola local y se envía al Sheet; si falla, queda pendiente.
-let busy=false;
+let busy=false,lastErr="";
 async function flush(){if(busy)return;if(!API.startsWith("http")){flash("Falta configurar la URL del Apps Script en index.html.",1);return}
- busy=true;
+ busy=true;lastErr="";
  while(ls.get("q",[]).length){const q=ls.get("q",[]),it=q[0];
-  try{const r=await fetch(API,{method:"POST",body:JSON.stringify({token:cfg.clave,tipo:it.tipo,id:it.id,rows:it.rows})}).then(r=>r.json());
-   if(!r.ok){if(r.error==="clave")flash("Clave incorrecta. Usa Historial › Cambiar usuario o clave.",1);throw 0}
+  let err="";try{const r=await fetch(API,{method:"POST",body:JSON.stringify({token:cfg.clave,tipo:it.tipo,id:it.id,rows:it.rows})}).then(r=>r.json());
+   if(!r.ok){err=r.error==="clave"?"Clave incorrecta. Usa Historial › Cambiar usuario o clave.":"El script respondió con error: "+r.error;throw 0}
    q.shift();ls.set("q",q);const h=ls.get("h",[]),x=h.find(y=>y.id===it.id);if(x){x.sent=true;ls.set("h",h)}}
-  catch(e){break}}
+  catch(e){lastErr=err||"No se pudo conectar con el script. Revisa que la implementación tenga acceso Cualquier persona.";break}}
  busy=false;paint()}
 async function save(tipoReg,id,rows,sum,btn){btn.disabled=true;
  const q=ls.get("q",[]);q.push({tipo:tipoReg,id,rows});ls.set("q",q);
  const h=ls.get("h",[]);h.unshift({...sum,id,tipo:tipoReg,sent:false});ls.set("h",h.slice(0,60));
  await flush();const sent=(ls.get("h",[]).find(y=>y.id===id)||{}).sent;
- flash(sent?"Guardado y enviado a Google Sheets ✔":"Guardado en este dispositivo. Se enviará cuando haya conexión.",!sent);btn.disabled=false}
+ flash(sent?"Guardado y enviado a Google Sheets ✔":"Guardado en este dispositivo, pero no se envió: "+(lastErr||"sin conexión"),!sent);btn.disabled=false}
 $("c_s").onclick=async()=>{const n=$("c_e").value,u=$("c_u").value.trim(),f=$("c_f").value;if(!u||!f)return flash("Completa fecha y usuario.",1);
  const t=tipo(n),id=nid("c",n),hora=new Date().toTimeString().slice(0,5),obs=$("c_o").value,sem=isoWeek(f),tn=$("c_t").value;
  const rows=CK[t].map((x,i)=>[AREA,sem,f,RESP,u,x[1],t,n,x[0],hora,tn,state[i]?"Si":"No",obs,id]);
@@ -144,6 +144,6 @@ function paint(){const h=ls.get("h",[]),p=ls.get("q",[]).length;
  $("sy_i").textContent=p?p+" registro(s) pendientes de enviar a Google Sheets.":"Todo enviado a Google Sheets.";$("sy").disabled=!p;
  $("l").innerHTML=h.length?h.map(r=>`<div class="card"><b>${esc(r.equipo)}</b> · ${r.tipo==="horometro"?esc(r.hr)+" h":"Checklist"} <span class="tag ${r.sent?"":"bad"}">${r.sent?"Enviado":"Pendiente"}</span>
  <div class="h">${esc(r.fecha)} · ${esc(r.turno)} · ${esc(r.usuario)}</div>${r.bad&&r.bad.length?`<div style="font-size:14px;margin-top:6px">${r.bad.map(i=>esc(i.item)+" "+crit(esc(i.criterio))).join(" · ")}</div>`:""}</div>`).join(""):`<div class="h" style="padding:4px">Sin registros en este dispositivo.</div>`}
-$("sy").onclick=flush;addEventListener("online",()=>cfg&&flush());
+$("sy").onclick=async()=>{await flush();ls.get("q",[]).length?flash(lastErr||"Sin conexión.",1):flash("Enviado a Google Sheets ✔")};addEventListener("online",()=>cfg&&flush());
 boot();
 </script></body></html>
