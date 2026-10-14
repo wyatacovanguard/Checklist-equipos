@@ -1,10 +1,12 @@
 <!DOCTYPE html>
 <html lang="es"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="manifest" href="manifest.webmanifest"><meta name="theme-color" content="#1f6f4a"><link rel="apple-touch-icon" href="icon-192.png"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="Equipos">
 <title>Registro de Equipos 26-27</title>
 <style>
 :root{--bg:#f5f6f4;--card:#fff;--tx:#1d2420;--mu:#68716b;--bd:#dde1dc;--ac:#1f6f4a;--ok:#1f6f4a;--no:#c0392b;--okb:#e4f3ea;--nob:#fbe6e3}
 @media (prefers-color-scheme:dark){:root{--bg:#151a17;--card:#1e2521;--tx:#e8ece9;--mu:#9aa49d;--bd:#333d37;--ac:#4fb583;--ok:#4fb583;--no:#e57366;--okb:#1e3a2b;--nob:#40221f}}
+[hidden]{display:none!important}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding-bottom:env(safe-area-inset-bottom,0px)}
 header{position:sticky;top:0;background:var(--card);border-bottom:1px solid var(--bd);z-index:5;padding-top:env(safe-area-inset-top,0px)}
@@ -35,15 +37,15 @@ input,select,textarea{width:100%;padding:11px;border:1px solid var(--bd);border-
 .h{font-size:13px;color:var(--mu)}
 .tot{font-size:22px;font-weight:700;color:var(--ac)}
 </style></head><body>
-<header><h1>Registro de Equipos 26-27</h1>
-<nav id="nav"><button data-t="ck" class="on">Checklist</button><button data-t="hr">Horómetro</button><button data-t="hi">Historial</button></nav></header>
+<header><h1>Registro de Equipos 26-27</h1><div class="h" id="who" style="padding:0 16px 6px"></div>
+<nav id="nav"><button data-t="ck" class="on">Checklist</button><button data-t="hr">Horómetro</button><button data-t="hi">Historial</button><button data-t="us">Usuarios</button></nav></header>
 <main>
 <div id="msg" class="msg"></div>
 
 <section id="cf" hidden>
  <div class="card"><b>Ingreso</b>
-  <label>Tu nombre</label><input id="f_n" placeholder="Nombre y apellido">
-  <label>Clave de acceso</label><input id="f_k" type="password" placeholder="Te la da el responsable">
+  <label>Usuario</label><input id="f_n" autocapitalize="none" autocomplete="username" placeholder="Tu usuario">
+  <label>Contraseña</label><input id="f_k" type="password" autocomplete="current-password">
   <button class="btn" id="f_s">Entrar</button></div>
 </section>
 
@@ -75,14 +77,26 @@ input,select,textarea{width:100%;padding:11px;border:1px solid var(--bd);border-
 <section id="hi" hidden>
  <div class="card"><div class="h" id="sy_i" style="margin-bottom:8px"></div>
   <button class="btn" id="sy" style="margin:0">Reintentar envío</button>
-  <button class="btn sec" id="lg">Cambiar usuario o clave</button></div>
+  <button class="btn sec" id="lg">Cerrar sesión</button></div>
  <div id="l"></div>
+</section>
+<section id="us" hidden>
+ <button class="btn" id="u_new" style="margin:0 0 12px">+ Nuevo usuario</button>
+ <div class="card" id="uf" hidden><b>Usuario</b>
+  <label>Usuario para ingresar (minúsculas)</label><input id="u_u" autocapitalize="none" placeholder="ej. jperez">
+  <label>Nombre completo</label><input id="u_n">
+  <label>Perfil</label><select id="u_r"><option value="registrador">Registrador</option><option value="admin">Administrador</option></select>
+  <label>Permisos (solo para Registrador)</label><div id="u_pm"></div>
+  <label>Contraseña (mínimo 6; vacía = no cambiarla)</label><input id="u_p" autocomplete="off">
+  <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="u_a" style="width:auto"> Activo</label>
+  <button class="btn" id="u_s">Guardar usuario</button><button class="btn sec" id="u_c">Cancelar</button></div>
+ <div id="ul"></div>
 </section>
 </main>
 
 <script>
 // Pega aquí la URL de tu Apps Script (termina en /exec)
-const API="https://script.google.com/macros/s/AKfycbw9WzZI2qv3aUa5ucuMD_YPlULb-dGehbD82xiWS6LqkyA8G84XQ4v5mK0bXRjkRK9g/exec";
+const API="https://script.google.com/macros/s/AKfycbxcrn0cr7fNukae2v4poTDCkHw1DmpF9OjVZOiRHhmhN8zyaDdh5VJH8GRk0eEUOZiW/exec";
 const AREA="Almacén de Producción",RESP="Hugo Yarihuaman";
 const EQ=[["AP 1","Apilador Eléctrico"],["AP 2","Apilador Eléctrico"],["AP 3","Apilador Eléctrico"]];
 for(let i=49;i<=66;i++)EQ.push(["AP-"+i,"Transpaleta Manual"]);
@@ -96,18 +110,28 @@ function isoWeek(s){const d=new Date(s+"T00:00:00Z"),n=(d.getUTCDay()+6)%7;d.set
 function flash(t,bad){const m=$("msg");m.textContent=t;m.className="msg"+(bad?" warn":"");m.style.display="block";scrollTo(0,0);clearTimeout(flash.t);flash.t=setTimeout(()=>m.style.display="none",4000)}
 const cl=c=>({Moderado:"m",Bajo:"b","Crítico":"c"})[c];
 const crit=c=>`<span class="cr ${cl(c)}">${c}</span>`;
-const tipo=n=>EQ.find(e=>e[0]===n)[1];
-let cfg=ls.get("cfg",null),state={};
+const tipo=n=>(EQ.find(e=>e[0]===n)||[])[1];
+let ses=ls.get("ses",null),state={};
+const isAdm=()=>ses&&ses.user.rol==="admin";
+const can=p=>ses&&(isAdm()||ses.user.permisos.split(",").includes(p));
+async function api(b){const r=await fetch(API,{method:"POST",body:JSON.stringify({...b,token:ses&&ses.token})});return r.json()}
+function logout(msg){ses=null;localStorage.removeItem("ses");if(msg)flash(msg,1);boot()}
+function show(id){["cf","ck","hr","hi","us"].forEach(s=>$(s).hidden=s!==id);document.querySelectorAll("#nav button").forEach(b=>b.classList.toggle("on",b.dataset.t===id));if(id==="hi")paint();if(id==="us")loadUsers()}
+function fillEq(){const L=EQ.filter(e=>can(e[1]==="Apilador Eléctrico"?"apilador":"transpaleta"));["c_e","h_e"].forEach(id=>$(id).innerHTML=L.map(e=>`<option value="${e[0]}">${e[0]} · ${e[1]}</option>`).join(""));renderItems()}
+function boot(){$("nav").hidden=!ses;if(!ses){$("who").textContent="";return show("cf")}
+ const t=x=>document.querySelector(`[data-t="${x}"]`);t("ck").hidden=!can("checklist");t("hr").hidden=!can("horometro");t("us").hidden=!isAdm();
+ $("who").textContent=ses.user.nombre+(isAdm()?" · Administrador":"");$("c_u").value=$("h_u").value=ses.user.nombre;fillEq();
+ show(can("checklist")?"ck":can("horometro")?"hr":"hi");flush();
+ api({accion:"me"}).then(r=>{if(r.ok){ses.user=r.user;ls.set("ses",ses)}else if(r.error==="sesion")logout("Tu sesión expiró. Ingresa de nuevo.")}).catch(()=>{})}
+$("f_s").onclick=async()=>{const u=$("f_n").value.trim(),p=$("f_k").value;if(!u||!p)return flash("Completa usuario y contraseña.",1);const b=$("f_s");b.disabled=true;
+ try{const r=await fetch(API,{method:"POST",body:JSON.stringify({accion:"login",usuario:u,pass:p})}).then(r=>r.json());
+  if(!r.ok)flash(r.error,1);else{ses={token:r.token,user:r.user};ls.set("ses",ses);$("f_k").value="";boot()}}
+ catch(e){flash("No se pudo conectar con el servidor. Revisa tu conexión.",1)}b.disabled=false};
+$("lg").onclick=()=>logout();
+document.querySelectorAll("#nav button").forEach(b=>b.onclick=()=>show(b.dataset.t));
 
-function show(id){["cf","ck","hr","hi"].forEach(s=>$(s).hidden=s!==id);document.querySelectorAll("#nav button").forEach(b=>b.classList.toggle("on",b.dataset.t===id))}
-function boot(){const ok=!!cfg;$("nav").hidden=!ok;if(!ok)return show("cf");$("c_u").value=$("h_u").value=cfg.nombre;show("ck");flush()}
-$("f_s").onclick=()=>{const n=$("f_n").value.trim(),k=$("f_k").value.trim();if(!n||!k)return flash("Completa nombre y clave.",1);cfg={nombre:n,clave:k};ls.set("cfg",cfg);boot()};
-$("lg").onclick=()=>{cfg=null;localStorage.removeItem("cfg");boot()};
-document.querySelectorAll("#nav button").forEach(b=>b.onclick=()=>{show(b.dataset.t);if(b.dataset.t==="hi")paint()});
-
-["c_e","h_e"].forEach(id=>$(id).innerHTML=EQ.map(e=>`<option value="${e[0]}">${e[0]} · ${e[1]}</option>`).join(""));
 $("c_f").value=$("h_f").value=today();
-function renderItems(){state={};const t=tipo($("c_e").value);
+function renderItems(){state={};const t=tipo($("c_e").value);if(!t){$("c_items").innerHTML='<div class="h">No tienes equipos habilitados para registrar.</div>';return}
  $("c_items").innerHTML=`<div class="h" style="margin-bottom:4px">${t}<br><span style="display:inline-flex;gap:6px;margin-top:6px">${crit("Moderado")}${crit("Bajo")}${crit("Crítico")}</span></div>`+CK[t].map((x,i)=>{state[i]=true;return `<div class="item ${cl(x[1])}"><div>${x[0]}<br>${crit(x[1])}</div><div class="sw" data-i="${i}"><button class="y on">Sí</button><button class="n">No</button></div></div>`}).join("")}
 $("c_e").onchange=renderItems;renderItems();
 $("c_items").onclick=e=>{const b=e.target.closest("button");if(!b)return;const sw=b.parentNode,i=sw.dataset.i;state[i]=b.classList.contains("y");sw.children[0].classList.toggle("on",state[i]);sw.children[1].classList.toggle("on",!state[i])};
@@ -116,21 +140,26 @@ function calcHr(){let a=mins($("h_i").value),b=mins($("h_n").value);if(b<a)b+=14
 ["h_i","h_n","h_p"].forEach(id=>$(id).oninput=calcHr);calcHr();
 const num=v=>v===""||v==null?"":+v,nid=(p,n)=>p+Date.now()+"-"+n.replace(/[^A-Za-z0-9]/g,"");
 
-// Envío: cada registro entra a una cola local y se envía al Sheet; si falla, queda pendiente.
+// Envío: cada registro entra a una cola local y se envía al servidor; si falla, queda pendiente.
 let busy=false,lastErr="";
-async function flush(){if(busy)return;if(!API.startsWith("http")){flash("Falta configurar la URL del Apps Script en index.html.",1);return}
+const mine=()=>ls.get("q",[]).filter(i=>ses&&i.u===ses.user.usuario);
+const drop=id=>ls.set("q",ls.get("q",[]).filter(i=>i.id!==id));
+function mark(id,st){const h=ls.get("h",[]),x=h.find(y=>y.id===id);if(x){x.st=st;ls.set("h",h)}}
+async function flush(){if(busy||!ses)return;if(!API.startsWith("http")){flash("Falta configurar la URL del Apps Script.",1);return}
  busy=true;lastErr="";
- while(ls.get("q",[]).length){const q=ls.get("q",[]),it=q[0];
-  let err="";try{const r=await fetch(API,{method:"POST",body:JSON.stringify({token:cfg.clave,tipo:it.tipo,id:it.id,rows:it.rows})}).then(r=>r.json());
-   if(!r.ok){err=r.error==="clave"?"Clave incorrecta. Usa Historial › Cambiar usuario o clave.":"El script respondió con error: "+r.error;throw 0}
-   q.shift();ls.set("q",q);const h=ls.get("h",[]),x=h.find(y=>y.id===it.id);if(x){x.sent=true;ls.set("h",h)}}
-  catch(e){lastErr=err||"No se pudo conectar con el script. Revisa que la implementación tenga acceso Cualquier persona.";break}}
+ while(mine().length){const it=mine()[0];
+  try{const r=await api({accion:"registrar",tipo:it.tipo,id:it.id,rows:it.rows});
+   if(r.ok){drop(it.id);mark(it.id,"ok");continue}
+   if(r.error==="sesion"){busy=false;logout("Sesión vencida: ingresa de nuevo.");return}
+   if(r.error==="permiso"){drop(it.id);mark(it.id,"rechazado");lastErr="No tienes permiso para este registro.";continue}
+   lastErr="El servidor respondió: "+r.error;break}
+  catch(e){lastErr="No se pudo conectar con el servidor. Revisa tu conexión.";break}}
  busy=false;paint()}
 async function save(tipoReg,id,rows,sum,btn){btn.disabled=true;
- const q=ls.get("q",[]);q.push({tipo:tipoReg,id,rows});ls.set("q",q);
- const h=ls.get("h",[]);h.unshift({...sum,id,tipo:tipoReg,sent:false});ls.set("h",h.slice(0,60));
- await flush();const sent=(ls.get("h",[]).find(y=>y.id===id)||{}).sent;
- flash(sent?"Guardado y enviado a Google Sheets ✔":"Guardado en este dispositivo, pero no se envió: "+(lastErr||"sin conexión"),!sent);btn.disabled=false}
+ const q=ls.get("q",[]);q.push({tipo:tipoReg,id,rows,u:ses.user.usuario});ls.set("q",q);
+ const h=ls.get("h",[]);h.unshift({...sum,id,tipo:tipoReg,st:"p",u:ses.user.usuario});ls.set("h",h.slice(0,80));
+ await flush();const st=(ls.get("h",[]).find(y=>y.id===id)||{}).st;
+ flash(st==="ok"?"Guardado y enviado ✔":st==="rechazado"?lastErr:"Guardado en este dispositivo, pero no se envió: "+(lastErr||"sin conexión"),st!=="ok");btn.disabled=false}
 $("c_s").onclick=async()=>{const n=$("c_e").value,u=$("c_u").value.trim(),f=$("c_f").value;if(!u||!f)return flash("Completa fecha y usuario.",1);
  const t=tipo(n),id=nid("c",n),hora=new Date().toTimeString().slice(0,5),obs=$("c_o").value,sem=isoWeek(f),tn=$("c_t").value;
  const rows=CK[t].map((x,i)=>[AREA,sem,f,RESP,u,x[1],t,n,x[0],hora,tn,state[i]?"Si":"No",obs,id]);
@@ -140,10 +169,28 @@ $("h_s").onclick=async()=>{const n=$("h_e").value,u=$("h_u").value.trim(),f=$("h
  const id=nid("h",n),tot=+calcHr().toFixed(2),tn=$("h_t").value;
  const rows=[[AREA,isoWeek(f),f,RESP,u,tipo(n),n,num($("h_k1").value),num($("h_k2").value),$("h_i").value,$("h_n").value,$("h_p").value,tot,num($("h_y").value),tn,$("h_o").value,id]];
  await save("horometro",id,rows,{equipo:n,fecha:f,turno:tn,usuario:u,hr:tot},$("h_s"))};
-function paint(){const h=ls.get("h",[]),p=ls.get("q",[]).length;
- $("sy_i").textContent=p?p+" registro(s) pendientes de enviar a Google Sheets.":"Todo enviado a Google Sheets.";$("sy").disabled=!p;
- $("l").innerHTML=h.length?h.map(r=>`<div class="card"><b>${esc(r.equipo)}</b> · ${r.tipo==="horometro"?esc(r.hr)+" h":"Checklist"} <span class="tag ${r.sent?"":"bad"}">${r.sent?"Enviado":"Pendiente"}</span>
- <div class="h">${esc(r.fecha)} · ${esc(r.turno)} · ${esc(r.usuario)}</div>${r.bad&&r.bad.length?`<div style="font-size:14px;margin-top:6px">${r.bad.map(i=>esc(i.item)+" "+crit(esc(i.criterio))).join(" · ")}</div>`:""}</div>`).join(""):`<div class="h" style="padding:4px">Sin registros en este dispositivo.</div>`}
-$("sy").onclick=async()=>{await flush();ls.get("q",[]).length?flash(lastErr||"Sin conexión.",1):flash("Enviado a Google Sheets ✔")};addEventListener("online",()=>cfg&&flush());
+function paint(){const h=ls.get("h",[]).filter(r=>ses&&r.u===ses.user.usuario),p=mine().length;
+ $("sy_i").textContent=p?p+" registro(s) pendientes de enviar.":"Todo enviado.";$("sy").disabled=!p;
+ const tg=r=>r.st==="ok"?'<span class="tag">Enviado</span>':r.st==="rechazado"?'<span class="tag bad">Sin permiso</span>':'<span class="tag bad">Pendiente</span>';
+ $("l").innerHTML=h.length?h.map(r=>`<div class="card"><b>${esc(r.equipo)}</b> · ${r.tipo==="horometro"?esc(r.hr)+" h":"Checklist"} ${tg(r)}
+ <div class="h">${esc(r.fecha)} · ${esc(r.turno)} · ${esc(r.usuario)}</div>${r.bad&&r.bad.length?`<div style="font-size:14px;margin-top:6px">${r.bad.map(i=>esc(i.item)+" "+crit(esc(i.criterio))).join(" · ")}</div>`:""}</div>`).join(""):`<div class="h" style="padding:4px">Sin registros de este usuario en este dispositivo. El historial completo está en el Google Sheet.</div>`}
+$("sy").onclick=async()=>{await flush();if(ses)mine().length?flash(lastErr||"Sin conexión.",1):flash("Enviado ✔")};
+addEventListener("online",()=>flush());
+
+// Administración de usuarios
+const PL=[["checklist","Registrar checklist"],["horometro","Registrar horómetro"],["apilador","Equipos: Apilador Eléctrico"],["transpaleta","Equipos: Transpaleta Manual"]];
+$("u_pm").innerHTML=PL.map(p=>`<label style="display:flex;gap:8px;align-items:center;color:var(--tx);font-size:15px;margin:6px 0"><input type="checkbox" style="width:auto" value="${p[0]}">${p[1]}</label>`).join("");
+let U=[];
+async function loadUsers(){try{const r=await api({accion:"usuarios"});if(!r.ok)throw r.error;U=r.usuarios;drawUsers()}catch(e){$("ul").innerHTML='<div class="h">No se pudo cargar: '+esc(e)+'</div>'}}
+function drawUsers(){$("ul").innerHTML=U.map((u,i)=>`<div class="card"><b>${esc(u.nombre)}</b> <span class="h">@${esc(u.usuario)}</span> <span class="tag ${u.activo?"":"bad"}">${u.rol==="admin"?"Admin":u.activo?"Activo":"Inactivo"}</span>
+ <div class="h">${u.rol==="admin"?"Todos los permisos":esc(u.permisos.split(",").filter(Boolean).map(p=>(PL.find(x=>x[0]===p)||[0,p])[1]).join(" · ")||"Sin permisos")}</div><button class="btn sec" data-e="${i}">Editar</button></div>`).join("")}
+function editU(u){$("u_u").value=u?u.usuario:"";$("u_u").disabled=!!u;$("u_n").value=u?u.nombre:"";$("u_r").value=u?u.rol:"registrador";$("u_a").checked=u?u.activo:true;$("u_p").value="";
+ const set=u?u.permisos.split(","):PL.map(p=>p[0]);document.querySelectorAll("#u_pm input").forEach(c=>c.checked=set.includes(c.value));$("uf").hidden=false;$("uf").scrollIntoView()}
+$("u_new").onclick=()=>editU(null);$("u_c").onclick=()=>$("uf").hidden=true;
+$("ul").onclick=e=>{const b=e.target.closest("[data-e]");if(b)editU(U[+b.dataset.e])};
+$("u_s").onclick=async()=>{const perm=[...document.querySelectorAll("#u_pm input:checked")].map(c=>c.value).join(",");
+ const r=await api({accion:"guardarUsuario",usuario:$("u_u").value,nombre:$("u_n").value.trim(),rol:$("u_r").value,permisos:perm,pass:$("u_p").value,activo:$("u_a").checked}).catch(()=>({ok:false,error:"Sin conexión"}));
+ if(!r.ok)return flash(r.error,1);flash("Usuario guardado ✔");$("uf").hidden=true;loadUsers()};
 boot();
+if("serviceWorker" in navigator)addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
 </script></body></html>
